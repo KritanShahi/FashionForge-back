@@ -73,6 +73,16 @@ router.post('/login', async (req, res) => {
 
 
 
+// Logout Route (example for token-based auth)
+router.post('/logout', (req, res) => {
+  // If using sessions:
+  // req.session.destroy();
+
+  // If using tokens:
+  res.clearCookie('token'); // Clear the cookie holding the token, if applicable
+  
+  res.status(200).json({ message: 'Logged out successfully' });
+});
 
 
 
