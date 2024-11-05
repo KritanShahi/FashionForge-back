@@ -4,7 +4,12 @@ const mongoose = require('mongoose');
 const commentSchema = new mongoose.Schema({
   user: { type: String, required: true },
   text: { type: String, required: true },
-  date: { type: Date, default: Date.now }
+  date: { type: Date, default: Date.now },
+  replies: [new mongoose.Schema({
+    user: { type: String, required: true },
+    text: { type: String, required: true },
+    date: { type: Date, default: Date.now }
+  })]
 });
 
 // Product Schema
