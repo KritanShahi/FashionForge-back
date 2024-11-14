@@ -70,18 +70,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Add a new comment to a product
-router.post('/:id/comments', async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-    const { user, text } = req.body;
-    product.comments.push({ user, text });
-    await product.save();
-    res.json(product.comments);
-  } catch (error) {
-    res.status(500).json({ error: 'Unable to add comment' });
-  }
-});
+
 
 // Increment product rating
 router.post('/:id/rate', async (req, res) => {
@@ -111,6 +100,19 @@ router.post('/:id/love', async (req, res) => {
 
 
 
+// Add a new comment to a product
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    const { user, text } = req.body;
+    product.comments.push({ user, text });
+    await product.save();
+    res.json(product.comments);
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to add comment' });
+  }
+});
+
 
 // Delete a comment by ID
 router.delete('/:productId/comments/:commentId', async (req, res) => {
@@ -132,6 +134,80 @@ router.delete('/:productId/comments/:commentId', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+/*
+router.delete('/:productId/comments/:commentId', async (req, res) => {
+  const { productId, commentId } = req.params;
+
+  try {
+    // Delete the comment from the product
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const commentIndex = product.comments.findIndex(comment => comment.id === commentId);
+    if (commentIndex === -1) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    product.comments.splice(commentIndex, 1);  // Remove the comment
+    await product.save();
+
+    res.status(200).json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Error deleting comment' });
+  }
+});*/
+
+/*
+// Update a comment
+router.put('/:productId/comments/:commentId', async (req, res) => {
+  const { productId, commentId } = req.params;
+  const { text } = req.body;
+
+  try {
+    const product = await Product.findById(productId);
+    const comment = product.comments.id(commentId);
+    if (comment) {
+      comment.text = text;
+      await product.save();
+      res.status(200).json({ message: 'Comment updated successfully' });
+    } else {
+      res.status(404).json({ message: 'Comment not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});*/
+
+// Example backend route for editing a comment
+router.put('/:productId/comments/:commentId', async (req, res) => {
+  try {
+    const { productId, commentId } = req.params;
+    const { text } = req.body;
+
+    // Ensure the comment text is not empty
+    if (!text || text.trim() === '') {
+      return res.status(400).send('Comment text cannot be empty');
+    }
+
+    // Find the product and update the specific comment
+    const product = await Product.findById(productId);
+    const comment = product.comments.id(commentId);
+
+    if (comment) {
+      comment.text = text; // Update the comment text
+      await product.save(); // Save the updated product
+      res.json(comment); // Send back the updated comment
+    } else {
+      res.status(404).send('Comment not found');
+    }
+  } catch (error) {
+    res.status(500).send('Error updating comment');
+  }
+});
+
 
 
 // Reply to a comment by ID
