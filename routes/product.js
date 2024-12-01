@@ -89,6 +89,28 @@ router.get('/', async (req, res) => {
   }
 });
 
+const rateProduct = async (req, res) => {
+  try {
+    const { userId, rating } = req.body;
+    const product = await Product.findById(req.params.id);
+
+    // Check if the user has already rated
+    if (product.ratedUsers.includes(userId)) {
+      return res.status(400).json({ message: 'You have already rated this product.' });
+    }
+
+    // Update product rating
+    const newRating = ((product.rating * product.ratingCount) + rating) / (product.ratingCount + 1);
+    product.rating = newRating;
+    product.ratingCount += 1;
+    product.ratedUsers.push(userId); // Add user ID to the list of rated users
+
+    await product.save();
+    res.status(200).json({ newRating: product.rating, newRatingCount: product.ratingCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rating product', error });
+  }
+};
 
 
 
@@ -134,7 +156,7 @@ router.get('/:id', async (req, res) => {
 });
 
 
-
+/*
 // Increment product rating
 router.post('/:id/rate', async (req, res) => {
   try {
@@ -148,7 +170,7 @@ router.post('/:id/rate', async (req, res) => {
     res.status(500).json({ error: 'Unable to update rating' });
   }
 });
-
+*/
 // Increment love count
 router.post('/:id/love', async (req, res) => {
   try {
@@ -160,6 +182,31 @@ router.post('/:id/love', async (req, res) => {
     res.status(500).json({ error: 'Unable to update love count' });
   }
 });
+
+// Rate product endpoint
+router.post('/:id/rate', async (req, res) => {
+  try {
+    const { userId, rating } = req.body;
+    const product = await Product.findById(req.params.id);
+
+    // Check if the user has already rated
+    if (product.ratedUsers.includes(userId)) {
+      return res.status(400).json({ message: 'You have already rated this product.' });
+    }
+
+    // Update product rating
+    const newRating = ((product.rating * product.ratingCount) + rating) / (product.ratingCount + 1);
+    product.rating = newRating;
+    product.ratingCount += 1;
+    product.ratedUsers.push(userId); // Add user to the ratedUsers array to track ratings
+
+    await product.save();
+    res.status(200).json({ newRating: product.rating, newRatingCount: product.ratingCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rating product', error });
+  }
+});
+
 
 
 

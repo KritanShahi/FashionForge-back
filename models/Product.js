@@ -21,7 +21,8 @@ const productSchema = new mongoose.Schema({
   rating: { type: Number, default: 0 },
   ratingCount: { type: Number, default: 0 },
   comments: [commentSchema],
-  favorites: { type: Number, default: 0 } // Tracks 'love' clicks
+  favorites: { type: Number, default: 0 },
+  ratedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]  
 });
 
 // Export the Product model
