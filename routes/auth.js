@@ -79,6 +79,44 @@ router.post('/logout', (req, res) => {
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
+/*
+
+router.post('/forget-password', (req, res) => {
+  const { username, email, newPassword } = req.body;
+
+  // Dummy data to simulate a database lookup
+  const user = { username: 'testuser', email: 'test@example.com' };
+
+  if (username !== user.username || email !== user.email) {
+    return res.status(404).json({ message: 'Username or email not registered.' });
+  }
+
+  // Simulate password reset logic
+  console.log(`Password for ${username} updated to: ${newPassword}`);
+  return res.status(200).json({ message: 'Password reset successfully.' });
+});*/
+router.post('/forget-password', async (req, res) => {
+  const { username, email, newPassword } = req.body;
+
+  try {
+    // Check if the username and email match an existing user
+    const user = await User.findOne({ username, email });
+    if (!user) {
+      return res.status(404).json({ message: 'Username or email not registered' });
+    }
+
+    // Proceed with password reset (hashing, saving new password, etc.)
+    user.password = await bcrypt.hash(newPassword, 10); // hash the new password
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Something went wrong, please try again later.' });
+  }
+});
+
+
+
 module.exports = router;
 
 // const router = require('express').Router();

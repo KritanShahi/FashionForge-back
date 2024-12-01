@@ -6,6 +6,8 @@ const authRoute = require("./routes/auth");
 
 const productRoutes = require('./routes/product');
 const cartRoutes = require('./routes/cart'); 
+const orderRoutes = require('./routes/order');
+const commentRoutes = require('./routes/comments');
 require('./connection');
 
 dotenv.config();
@@ -22,7 +24,8 @@ app.use(express.json());
 app.use("/api", authRoute);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
-
+app.use('/api/comment', commentRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.listen(8080, () => {
     console.log("Server is running on port 8080");
