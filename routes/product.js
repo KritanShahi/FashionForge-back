@@ -5,65 +5,82 @@ const User = require('../models/User');
 const Order = require('../models/Order'); 
 
 
-
 router.get('/dashboard-stats', async (req, res) => {
   try {
+
+    // Total customers
     const totalCustomers = await User.countDocuments();
-    if (totalCustomers === undefined) {
-      throw new Error('Failed to fetch total customers');
-    }
 
+    // Total products
     const totalProducts = await Product.countDocuments();
-    if (totalProducts === undefined) {
-      throw new Error('Failed to fetch total products');
-    }
 
-    const totalProductsSold = await Order.aggregate([
+    // Total products sold
+    const totalProductsSoldData = await Order.aggregate([
       { $unwind: '$products' },
-      { $group: { _id: null, totalSold: { $sum: '$products.quantity' } } },
+      {
+        $group: {
+          _id: null,
+          totalSold: { $sum: '$products.quantity' }
+        }
+      }
     ]);
 
-    if (!totalProductsSold[0]) {
-      throw new Error('Failed to fetch total products sold');
-    }
+    // FIX: handle empty result
+    const totalProductsSold =
+      totalProductsSoldData.length > 0
+        ? totalProductsSoldData[0].totalSold
+        : 0;
 
+    // Recent orders
     const recentOrders = await Order.aggregate([
-      { $sort: { createdAt: -1 } }, // Sort by the latest order
-      { $limit: 5 }, // Limit to the 5 most recent orders
+      { $sort: { createdAt: -1 } },
+      { $limit: 5 },
+
       {
         $lookup: {
-          from: 'users', // Join with the User collection
-          localField: 'userId', // Matching field in orders
-          foreignField: '_id', // Matching field in users
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
           as: 'userDetails',
         },
       },
-      { $unwind: '$userDetails' }, // Flatten the userDetails array
+
+      {
+        $unwind: {
+          path: '$userDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
       {
         $project: {
           _id: 1,
-          'userDetails.name': 1,    // Include 'name' from userDetails
-          'userDetails.email': 1,   // Include 'email' from userDetails
-          'userDetails.phone': 1,   // Include 'phone' from userDetails
-          'status': 1,
+          'userDetails.name': 1,
+          'userDetails.email': 1,
+          'userDetails.phone': 1,
+          status: 1,
         },
       },
     ]);
 
-    // Send the response with all the data
     res.status(200).json({
       totalCustomers,
       totalProducts,
-      totalProductsSold: totalProductsSold[0].totalSold,
-      recentOrders, // Include the recent orders in the response
+      totalProductsSold,
+      recentOrders,
     });
 
   } catch (err) {
-    console.error('Error:', err);
-    res.status(500).json({ message: 'Error fetching stats', error: err.message });
+
+    console.error("Dashboard Stats Error:", err);
+
+    res.status(500).json({
+      message: "Error fetching stats",
+      error: err.message
+    });
+
   }
 });
-
 
 
 //CREATE
