@@ -1,84 +1,69 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { functionDeclarations, executeToolCall } = require('./geminiDbTools');
+// geminiChat.js
+// Local version of Gemini chat — no API, no limits, fake AI responses
 
-const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const MAX_TOOL_ROUNDS = 8;
+const { executeToolCall } = require('./geminiDbTools');
 
-const SYSTEM_INSTRUCTION = `You are FashionForge Assistant, a helpful chatbot for an e-commerce fashion API backed by MongoDB.
-You can answer questions about products, orders, carts, and users by calling the provided tools.
-Rules:
-- Use tools whenever the user asks for data that lives in the database (counts, lists, prices, order status, etc.).
-- Summarize tool results clearly for non-technical users. Use plain language.
-- Never invent database facts; if tools return empty or errors, say so.
-- User documents from tools never include password fields; do not claim you can see passwords.
-- Order documents include a customer "name" field captured at checkout.
-- Product comments are embedded in product documents.`;
+const MAX_TOOL_ROUNDS = 5;
 
-function buildTools() {
-  return [{ functionDeclarations }];
-}
+const SYSTEM_INSTRUCTION = `You are FashionForge Assistant, a helpful chatbot for an e-commerce fashion API.
+You can answer questions about products, orders, carts, and users using the provided local tools.
+Summarize results clearly. Never invent facts.`;
 
-function normalizeHistory(history) {
-  if (!Array.isArray(history)) return [];
-  const out = [];
-  for (const h of history) {
-    if (!h || typeof h.role !== 'string' || typeof h.text !== 'string') continue;
-    const role = h.role === 'assistant' ? 'model' : 'user';
-    if (role !== 'model' && role !== 'user') continue;
-    const text = h.text.trim();
-    if (!text) continue;
-    out.push({ role, parts: [{ text }] });
-  }
-  return out.slice(-20);
-}
-
+// Local "AI-like" simulator
 async function runGeminiChat(userMessage, history = []) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Missing GEMINI_API_KEY in environment');
+  // Keep a simple chat history
+  history.push({ role: 'user', text: userMessage });
+
+  let reply = '';
+
+  const lower = userMessage.toLowerCase();
+
+  try {
+    // Detect keywords and call local tools
+    if (lower.includes('list products')) {
+      const res = await executeToolCall('list_products', {});
+      reply = res.products
+        ? `Here are some products: ${res.products.map(p => p.name).join(', ')}`
+        : 'No products found.';
+    } else if (lower.includes('product')) {
+      const idMatch = userMessage.match(/\d+/);
+      if (idMatch) {
+        const res = await executeToolCall('get_product_by_id', { productId: idMatch[0] });
+        reply = res.product
+          ? `Product: ${res.product.name}, $${res.product.price}`
+          : res.error || 'Product not found.';
+      } else {
+        reply = 'Please provide a product ID in your message.';
+      }
+    } else if (lower.includes('orders')) {
+      const res = await executeToolCall('list_orders', {});
+      reply = res.orders
+        ? `Recent orders: ${res.orders.map(o => `${o.name} (${o.status})`).join(', ')}`
+        : 'No orders found.';
+    } else if (lower.includes('cart')) {
+      const userIdMatch = userMessage.match(/u\d+/);
+      if (userIdMatch) {
+        const res = await executeToolCall('get_cart_for_user', { userId: userIdMatch[0] });
+        reply = res.cart
+          ? `Cart has ${res.cart.items.length} items.`
+          : res.message || 'No cart found for this user.';
+      } else {
+        reply = 'Please provide a user ID like u1 or u2.';
+      }
+    } else if (lower.includes('summary')) {
+      const res = await executeToolCall('get_store_summary', {});
+      reply = `Store summary: ${res.totalProducts} products, ${res.totalCustomers} customers, ${res.totalProductsSold} total sales.`;
+    } else {
+      // Default greeting
+      reply = "Hi! I'm your fashion assistant. You can ask me about products, orders, carts, or store summary.";
+    }
+  } catch (e) {
+    reply = "Sorry, something went wrong locally.";
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: MODEL_NAME,
-    tools: buildTools(),
-    systemInstruction: SYSTEM_INSTRUCTION,
-  });
+  history.push({ role: 'assistant', text: reply });
 
-  const chat = model.startChat({
-    history: normalizeHistory(history),
-  });
-
-  let result = await chat.sendMessage(userMessage);
-  let response = result.response;
-
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const calls = response.functionCalls();
-    if (!calls || calls.length === 0) {
-      const text = response.text();
-      return { reply: text, model: MODEL_NAME };
-    }
-
-    const parts = [];
-    for (const call of calls) {
-      const payload = await executeToolCall(call.name, call.args);
-      parts.push({
-        functionResponse: {
-          name: call.name,
-          response: payload,
-        },
-      });
-    }
-
-    result = await chat.sendMessage(parts);
-    response = result.response;
-  }
-
-  return {
-    reply:
-      'I had to stop after too many database lookups. Please ask a simpler question or narrow what you need.',
-    model: MODEL_NAME,
-  };
+  return { reply, history };
 }
 
-module.exports = { runGeminiChat, MODEL_NAME };
+module.exports = { runGeminiChat };
