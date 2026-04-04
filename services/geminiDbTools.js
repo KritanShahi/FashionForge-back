@@ -3,7 +3,7 @@ const { SchemaType } = require('@google/generative-ai');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const Cart = require('../models/Cart');
-const Order = require('../models/order');
+const Order = require('../models/Order');
 
 const MAX_LIST = 40;
 
