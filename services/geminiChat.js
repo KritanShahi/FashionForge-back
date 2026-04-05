@@ -1,215 +1,163 @@
 // geminiChat.js
+
 const { executeToolCall } = require('./geminiDbTools');
 
-const MAX_TOOL_ROUNDS = 5;
-
-const SYSTEM_INSTRUCTION = `You are FashionForge Assistant, a helpful chatbot for an e-commerce fashion API.
-You answer questions about products, orders, carts, and store summaries using local tools.
-Do not invent facts. Summarize clearly.`;
-
-// Local AI-like chat
 async function runGeminiChat(userMessage, history = []) {
-
-  history.push({ role: 'user', text: userMessage });
+  history.push({
+    role: 'user',
+    text: userMessage
+  });
 
   let reply = '';
-  let action = null; // navigation support
+  let action = null;
+  let productId = null;
 
   const lower = userMessage.toLowerCase();
 
   try {
 
-    // ---------------- NAVIGATION ----------------
+    // ================= GREETING =================
+    if (['hi', 'hello', 'hlo', 'hey'].includes(lower)) {
+      reply = `Hi 👋 I'm your Fashion Assistant.
 
-    if (
-      lower.includes('go to cart') ||
-      lower.includes('open cart')
-    ) {
+Here is what I can do:
 
-      reply = 'Opening cart...';
+🛍 Show all products  
+🔍 Search product by name  
+💰 Find cheapest product  
+💎 Find expensive product  
+📦 Show in-stock products  
+❌ Show out-of-stock products  
+📊 Count products  
+🛒 Open cart  
+📋 Show orders  
+
+Try:
+
+• products  
+• cheapest product  
+• most expensive product  
+• in stock products  
+• go to cart`;
+    }
+
+    // ================= NAVIGATION =================
+    else if (lower.includes('go to cart')) {
+      reply = 'Opening cart 🛒...';
       action = 'navigate_cart';
-
-    }
-
-    else if (
-      lower.includes('go to products') ||
-      lower.includes('open products')
-    ) {
-
-      reply = 'Opening products page...';
+    } else if (lower.includes('go to products')) {
+      reply = 'Opening products 🛍...';
       action = 'navigate_products';
-
+    } else if (lower.includes('go to orders')) {
+      reply = 'Opening orders 📦...';
+      action = 'navigate_orders';
     }
 
-    // ---------------- PRODUCT COUNT ----------------
+    // ================= NAVIGATE PRODUCT =================
+    else if (lower.startsWith('go to ')) {
+      const name = lower.replace('go to', '').trim();
+      const res = await executeToolCall('search_products', { searchText: name, limit: 1 });
 
-    else if (
-      lower.includes('how many products') ||
-      lower.includes('total products')
-    ) {
+      if (res.products?.length) {
+        const p = res.products[0];
+        reply = `Opening ${p.name} 🛍...`;
+        action = 'navigate_product';
+        productId = p._id;
+      } else {
+        reply = `No product found matching "${name}".`;
+      }
+    }
 
-      const res = await executeToolCall(
-        'count_documents',
-        { collection: 'products' }
-      );
-
+    // ================= COUNT PRODUCTS =================
+    else if (lower.includes('how many products') || lower.includes('total products')) {
+      const res = await executeToolCall('count_documents', { collection: 'products' });
       reply = `There are ${res.count} products in the store.`;
-
     }
 
-    // ---------------- CART COUNT ----------------
-
-    else if (
-      lower.includes('how many carts')
-    ) {
-
-      const res = await executeToolCall(
-        'count_documents',
-        { collection: 'carts' }
-      );
-
-      reply = `There are ${res.count} carts in the system.`;
-
-    }
-
-    // ---------------- SHOW ALL PRODUCTS ----------------
-
-    else if (
-      lower === 'products' ||
-      lower.includes('list products') ||
-      lower.includes('show products')
-    ) {
-
-      const res = await executeToolCall(
-        'search_products',
-        { searchText: '', limit: 20 }
-      );
-
-      if (res.products && res.products.length) {
-
+    // ================= SHOW PRODUCTS =================
+    else if (lower === 'products' || lower.includes('show products')) {
+      const res = await executeToolCall('search_products', { searchText: '', limit: 20 });
+      if (res.products?.length) {
         reply = res.products
-          .map(p =>
-            `🛍 ${p.name}
-Price: $${p.price}
-Stock: ${p.stock ?? 0}
-${p.description || 'No description'}`
-          )
+          .map(p => `🛍 ${p.name}\n💰 $${p.price}\n📦 Stock: ${p.stock ?? 0}`)
           .join('\n\n');
-
       } else {
-
         reply = 'No products found.';
-
       }
-
     }
 
-    // ---------------- ORDERS ----------------
-
-    else if (
-      lower.includes('orders')
-    ) {
-
-      const res = await executeToolCall(
-        'list_orders',
-        {}
-      );
-
-      if (res.orders && res.orders.length) {
-
-        reply =
-          'Orders:\n' +
-          res.orders
-            .map(o =>
-              `${o.name} (${o.status}) - $${o.total}`
-            )
-            .join('\n');
-
-      } else {
-
-        reply = 'No orders found.';
-
+    // ================= CHEAPEST PRODUCT =================
+    else if (lower.includes('cheap') || lower.includes('lowest')) {
+      const res = await executeToolCall('search_products', { searchText: '', limit: 50 });
+      if (res.products?.length) {
+        const cheapest = res.products.reduce((min, p) => (p.price < min.price ? p : min));
+        reply = `💰 Cheapest Product:\n\n🛍 ${cheapest.name}\nPrice: $${cheapest.price}`;
       }
-
     }
 
-    // ---------------- CART VIEW ----------------
-
-    else if (
-      lower.includes('cart')
-    ) {
-
-      reply =
-        'To open your cart, type "go to cart".';
-
+    // ================= MOST EXPENSIVE =================
+    else if (lower.includes('expensive') || lower.includes('highest')) {
+      const res = await executeToolCall('search_products', { searchText: '', limit: 50 });
+      if (res.products?.length) {
+        const expensive = res.products.reduce((max, p) => (p.price > max.price ? p : max));
+        reply = `💎 Most Expensive Product:\n\n🛍 ${expensive.name}\nPrice: $${expensive.price}`;
+      }
     }
 
-    // ---------------- AUTO PRODUCT SEARCH (MAIN FIX) ----------------
-
-    else {
-
-      // Try product search automatically
-      const res = await executeToolCall(
-        'search_products',
-        {
-          searchText: userMessage,
-          limit: 5
-        }
-      );
-
-      if (
-        res.products &&
-        res.products.length > 0
-      ) {
-
-        reply = res.products
-          .map(p =>
-            `🛍 ${p.name}
-Price: $${p.price}
-Stock: ${p.stock ?? 0}
-${p.description || 'No description'}`
-          )
+    // ================= IN STOCK =================
+    else if (lower.includes('in stock')) {
+      const res = await executeToolCall('search_products', { searchText: '', limit: 50 });
+      const available = res.products.filter(p => (p.stock ?? 0) > 0);
+      if (available.length) {
+        reply = available
+          .map(p => `🛍 ${p.name}\nStock: ${p.stock}`)
           .join('\n\n');
-
+      } else {
+        reply = 'No products currently in stock.';
       }
-
-      else {
-
-        reply =
-          "I couldn't find that. Try asking:\n" +
-          "- products\n" +
-          "- how many products\n" +
-          "- orders\n" +
-          "- go to cart";
-
-      }
-
     }
 
+    // ================= OUT OF STOCK =================
+    else if (lower.includes('out of stock')) {
+      const res = await executeToolCall('search_products', { searchText: '', limit: 50 });
+      const unavailable = res.products.filter(p => (p.stock ?? 0) === 0);
+      if (unavailable.length) {
+        reply = unavailable.map(p => `❌ ${p.name}`).join('\n');
+      } else {
+        reply = 'All products are in stock.';
+      }
+    }
+
+    // ================= ORDERS =================
+    else if (lower.includes('orders')) {
+      const res = await executeToolCall('list_orders', {});
+      if (res.orders?.length) {
+        reply = res.orders.map(o => `${o.name} (${o.status})`).join('\n');
+      } else {
+        reply = 'No orders found.';
+      }
+    }
+
+    // ================= DEFAULT PRODUCT SEARCH =================
+    else {
+      const res = await executeToolCall('search_products', { searchText: userMessage, limit: 5 });
+      if (res.products?.length) {
+        reply = res.products
+          .map(p => `🛍 ${p.name}\n💰 $${p.price}\n📦 Stock: ${p.stock ?? 0}\n${p.description || ''}`)
+          .join('\n\n');
+      } else {
+        reply = `I didn't understand.\n\nTry:\n• products\n• cheapest product\n• most expensive product\n• in stock products\n• go to cart`;
+      }
+    }
+
+  } catch (err) {
+    console.error(err);
+    reply = 'Something went wrong.';
   }
 
-  catch (e) {
+  history.push({ role: 'assistant', text: reply });
 
-    console.error('Gemini Chat error:', e);
-
-    reply =
-      'Sorry, something went wrong locally.';
-
-  }
-
-  history.push({
-    role: 'assistant',
-    text: reply
-  });
-
-  return {
-    reply,
-    history,
-    action // important for frontend
-  };
-
+  return { reply, history, action, productId };
 }
 
-module.exports = {
-  runGeminiChat
-};
+module.exports = { runGeminiChat };
