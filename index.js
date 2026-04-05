@@ -8,6 +8,7 @@ const productRoutes = require('./routes/product');
 const cartRoutes = require('./routes/cart'); 
 const orderRoutes = require('./routes/order');
 const commentRoutes = require('./routes/comments');
+const chatRoute=require('./routes/chat');
 require('./connection');
 
 dotenv.config();
@@ -26,6 +27,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/comment', commentRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/chat', chatRoute);
 
 const PORT = process.env.PORT || 8080;
 
