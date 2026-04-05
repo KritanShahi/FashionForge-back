@@ -10,7 +10,7 @@ const commentSchema = new mongoose.Schema({
     text: { type: String, required: true },
     date: { type: Date, default: Date.now }
   })]
-});
+}); 
 
 // Product Schema
 const productSchema = new mongoose.Schema({

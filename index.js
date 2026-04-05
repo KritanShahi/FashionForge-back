@@ -27,6 +27,9 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/comment', commentRoutes);
 app.use('/api/orders', orderRoutes);
 
-app.listen(8080, () => {
-    console.log("Server is running on port 8080");
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
+
