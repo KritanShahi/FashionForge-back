@@ -1,6 +1,39 @@
-// geminiChat.js
-
+// services/geminiChat.js
+require('dotenv').config();
+const axios = require('axios');
 const { executeToolCall } = require('./geminiDbTools');
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+
+async function callGeminiAI(userMessage, history = []) {
+  try {
+    const prompt = history
+      .map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`)
+      .join('\n') + `\nUser: ${userMessage}\nAssistant:`;
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta2/models/${GEMINI_MODEL}:generateText`,
+      {
+        prompt: { text: prompt },
+        temperature: 0.7,
+        maxOutputTokens: 300,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GEMINI_API_KEY}`,
+        },
+      }
+    );
+
+    const reply = response.data?.candidates?.[0]?.output?.[0]?.content?.[0]?.text;
+    return reply || null;
+  } catch (err) {
+    console.error('Gemini AI call failed:', err.message);
+    return null; // fallback to MongoDB
+  }
+}
 
 async function runGeminiChat(userMessage, history = []) {
   history.push({ role: 'user', text: userMessage });
@@ -12,7 +45,6 @@ async function runGeminiChat(userMessage, history = []) {
   const lower = userMessage.toLowerCase();
 
   try {
-
     // ================= GREETING =================
     if (['hi', 'hello', 'hlo', 'hey'].includes(lower)) {
       reply = `Hi! I'm your Fashion Assistant.
@@ -65,7 +97,7 @@ Try typing: products, cheapest product, in stock products, or go to cart.`;
 
     // ================= SHOW PRODUCTS =================
     else if (lower === 'products' || lower.includes('show products')) {
-      const res = await executeToolCall('search_products', { searchText: '', limit: 20 });
+      const res = await executeToolCall('search_products', { searchText: '', limit: 3 }); // only show 3
       if (res.products?.length) {
         reply = res.products
           .map(p => `${p.name} - $${p.price} - Stock: ${p.stock ?? 0}`)
@@ -121,13 +153,20 @@ Try typing: products, cheapest product, in stock products, or go to cart.`;
 
     // ================= DEFAULT PRODUCT SEARCH =================
     else {
-      const res = await executeToolCall('search_products', { searchText: userMessage, limit: 5 });
-      if (res.products?.length) {
-        reply = res.products
-          .map(p => `${p.name} - $${p.price} - Stock: ${p.stock ?? 0}${p.description ? ' - ' + p.description : ''}`)
-          .join('\n\n');
+      // First try Gemini AI
+      const geminiReply = await callGeminiAI(userMessage, history);
+      if (geminiReply) {
+        reply = geminiReply;
       } else {
-        reply = `I didn't understand. Try typing: products, cheapest product, most expensive product, in stock products, or go to cart.`;
+        // fallback to MongoDB
+        const res = await executeToolCall('search_products', { searchText: userMessage, limit: 3 });
+        if (res.products?.length) {
+          reply = res.products
+            .map(p => `${p.name} - $${p.price} - Stock: ${p.stock ?? 0}${p.description ? ' - ' + p.description : ''}`)
+            .join('\n\n');
+        } else {
+          reply = `I didn't understand. Try typing: products, cheapest product, most expensive product, in stock products, or go to cart.`;
+        }
       }
     }
 
@@ -137,7 +176,6 @@ Try typing: products, cheapest product, in stock products, or go to cart.`;
   }
 
   history.push({ role: 'assistant', text: reply });
-
   return { reply, history, action, productId };
 }
 
