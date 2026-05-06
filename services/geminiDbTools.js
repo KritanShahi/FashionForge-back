@@ -5,7 +5,7 @@ const User = require('../models/User');
 const Cart = require('../models/Cart');
 const Order = require('../models/Order');
 
-const MAX_LIST = 40;
+const MAX_LIST = 1000; // Increase max list for "all products" safely
 
 // ------------------- HELPERS -------------------
 
@@ -21,14 +21,32 @@ function toPlain(value) {
 
 // ------------------- TOOL FUNCTIONS -------------------
 
-// Search products by name substring
+// Utility: Log products in table format
+function logProducts(docs) {
+  if (!docs.length) {
+    console.log('⚠️ No products found');
+    return;
+  }
+  console.log('📦 Products fetched:');
+  console.table(docs.map(p => ({
+    Name: p.name,
+    Price: p.price,
+    Stock: p.stock ?? 0,
+    Description: p.description || 'No description'
+  })));
+}
+
+// Search products by name substring or get all
 async function search_products(args) {
-  const limit = safeLimit(args.limit, 20);
+  const limit = args.limit === 0 ? 0 : safeLimit(args.limit, 20); // 0 = fetch all
   const searchText = args.searchText && String(args.searchText).trim();
   const query = searchText
     ? { name: { $regex: searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
     : {};
+  
   const docs = await Product.find(query).sort({ _id: -1 }).limit(limit).lean();
+  logProducts(docs);
+
   return {
     products: docs.map(p => ({
       name: p.name,
@@ -43,7 +61,10 @@ async function search_products(args) {
 async function get_product_by_name(args) {
   const name = args.name && String(args.name).trim();
   if (!name) return { error: 'Provide a product name.' };
-  return await search_products({ searchText: name, limit: 10 });
+
+  const result = await search_products({ searchText: name, limit: 10 });
+  console.log(`🔎 get_product_by_name called for: "${name}"`);
+  return result;
 }
 
 // Count documents in collections
