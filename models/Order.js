@@ -37,4 +37,3 @@ module.exports =
   mongoose.models.Order ||
   mongoose.model("Order", orderSchema);
 
-
