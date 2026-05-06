@@ -41,20 +41,7 @@ router.post("/buy", (req, res) => {
     }
   });
   
-/*
 
-  // Fetch all orders
-router.get('/', async (req, res) => {
-    try {
-      const orders = await Order.find();
-      res.json(orders);
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching orders' });
-    }
-  });
-*/
-
-// Fetch all orders with populated product details
 router.get('/', async (req, res) => {
     try {
       const orders = await Order.find().populate('products.productId');
@@ -63,25 +50,7 @@ router.get('/', async (req, res) => {
       res.status(500).json({ message: 'Error fetching orders' });
     }
   });
-  /*
-  router.get('/:id', async (req, res) => {
-    const { id } = req.params;
-  
-    try {
-      const order = await Order.findById(id)
-        .populate('userId', 'name') // Populate user details (e.g., name)
-        .populate('products.productId', 'name price description'); // Populate product details
-  
-      if (!order) {
-        return res.status(404).json({ message: 'Order not found' });
-      }
-  
-      res.json(order);
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching order', error: error.message });
-    }
-  });
-*/
+ 
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
@@ -100,28 +69,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-  /*
-  router.put('/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { status, deliveryDate } = req.body; // Include deliveryDate in the body
-  
-      const updatedOrder = await Order.findByIdAndUpdate(
-        id, 
-        { status, deliveryDate }, 
-        { new: true }
-      );
-  
-      if (!updatedOrder) {
-        return res.status(404).json({ message: 'Order not found' });
-      }
-  
-      res.json(updatedOrder);
-    } catch (error) {
-      res.status(500).json({ message: 'Error updating order', error: error.message });
-    }
-  });
-*/
+
 router.put('/:id', async (req, res) => {
     try {
       const updatedOrder = await Order.findByIdAndUpdate(
@@ -151,7 +99,7 @@ router.put('/:orderId/cancel', async (req, res) => {
       await order.save();
       res.status(200).send(order);
     } catch (error) {
-      res.status(500).send('Error cancelling order');
+      res.status(500).send('Error cancelling order');s
     }
   });
   

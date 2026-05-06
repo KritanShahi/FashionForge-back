@@ -173,22 +173,7 @@ router.get('/:id', async (req, res) => {
 });
 
 
-/*
-// Increment product rating
-router.post('/:id/rate', async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-    const { newRating } = req.body;
-    product.rating = (product.rating * product.ratingCount + newRating) / (product.ratingCount + 1);
-    product.ratingCount += 1;
-    await product.save();
-    res.json({ rating: product.rating, ratingCount: product.ratingCount });
-  } catch (error) {
-    res.status(500).json({ error: 'Unable to update rating' });
-  }
-});
-*/
-// Increment love count
+
 router.post('/:id/love', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
